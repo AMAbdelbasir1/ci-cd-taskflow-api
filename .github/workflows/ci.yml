@@ -40,6 +40,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Restart app with PM2
+      - name: Restart app with PM2 (PowerShell safe)
+        shell: powershell
         run: |
-          pm2 restart taskflow-api || pm2 start src/server.js --name taskflow-api
+          $process = pm2 list | Select-String "taskflow-api"
+          if ($process) {
+              pm2 restart taskflow-api
+          } else {
+              pm2 start src/server.js --name taskflow-api
+          }
