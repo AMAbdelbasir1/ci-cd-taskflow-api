@@ -2,7 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - develop
 
 jobs:
   # -------------------
@@ -12,40 +14,58 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Setup Node
-        uses: actions/setup-node@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: 20
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run tests
-        run: npm test
+      - run: npm ci
+      - run: npm test
 
   # -------------------
-  # 2️⃣ CD - Deploy
+  # 2️⃣ Deploy to Staging (develop branch)
   # -------------------
-  deploy:
+  deploy-staging:
+    if: github.ref == 'refs/heads/develop'
     needs: test
     runs-on: self-hosted
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Install dependencies
-        run: npm install
+      - run: npm install
 
-      - name: Restart app with PM2 (PowerShell safe)
+      - name: Start/Restart Staging App
         shell: powershell
         run: |
-          $process = pm2 list | Select-String "taskflow-api"
+          $process = pm2 list | Select-String "taskflow-staging"
           if ($process) {
-              pm2 restart taskflow-api
+              pm2 restart taskflow-staging
           } else {
-              pm2 start src/server.js --name taskflow-api
+              $env:PORT=4000
+              pm2 start src/server.js --name taskflow-staging --env staging
+          }
+
+  # -------------------
+  # 3️⃣ Deploy to Production (main branch)
+  # -------------------
+  deploy-production:
+    if: github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - run: npm install
+
+      - name: Start/Restart Production App
+        shell: powershell
+        run: |
+          $process = pm2 list | Select-String "taskflow-production"
+          if ($process) {
+              pm2 restart taskflow-production
+          } else {
+              pm2 start src/server.js --name taskflow-production
           }
